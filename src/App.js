@@ -33,30 +33,43 @@ export class App extends React.Component {
 
 
   componentDidMount () {
-    window.JitsiMeetJS.mediaDevices.enumerateDevices((devices) => {
-      let newDeviceList = []
-      for (let device of devices) {
-          // if (device.deviceId !== 'default' && device.deviceId !== 'communications') {
-              newDeviceList.push({ name: device.label, id: device.deviceId, type: device.kind })
-          // }
-      }
-      let micId = (_.find(newDeviceList, { type: 'audioinput' }) || {}).id || 'none'
-      let videoId = (_.find(newDeviceList, { type: 'videoinput' }) || {}).id || 'none'
-      let speakerId = (_.find(newDeviceList, { type: 'audiooutput' }) || {}).id || 'none'
-      this.setState({
-        deviceList: newDeviceList,
-        defaultMicId: micId,
-        defaultVideoId: videoId,
-        defaultSpeakerId: speakerId,
-        loaded: true
-      })
-    })
+    if (!window.JitsiMeetJS) {
+      setTimeout(() => this.setState({jitsiLoaded: true}), 10000);
+    } else {
+      this.jitsiReactInit();
+    }
   }
 
   componentDidUpdate () {
-
+    if (!window.JitsiMeetJS) {
+      this.jitsiReactInit();
+    }
   }
-  
+
+  jitsiReactInit = () => {
+    if (window.JitsiMeetJS) {
+      window.JitsiMeetJS.init();
+      window.JitsiMeetJS.mediaDevices.enumerateDevices((devices) => {
+        let newDeviceList = []
+        for (let device of devices) {
+          // if (device.deviceId !== 'default' && device.deviceId !== 'communications') {
+          newDeviceList.push({ name: device.label, id: device.deviceId, type: device.kind })
+          // }
+        }
+        let micId = (_.find(newDeviceList, { type: 'audioinput' }) || {}).id || 'none'
+        let videoId = (_.find(newDeviceList, { type: 'videoinput' }) || {}).id || 'none'
+        let speakerId = (_.find(newDeviceList, { type: 'audiooutput' }) || {}).id || 'none'
+        this.setState({
+          deviceList: newDeviceList,
+          defaultMicId: micId,
+          defaultVideoId: videoId,
+          defaultSpeakerId: speakerId,
+          loaded: true
+        })
+      })
+    }
+  }
+
   onSpeakerChanged = (newSpeaker) => {
     this.setState({
       selectedSpeakerDeviceId: newSpeaker.id
@@ -84,13 +97,13 @@ export class App extends React.Component {
     let matchTrack = _.find(this.remoteTracks, { id: newTrackId })
     if (matchTrack) {
       return
-    }  
+    }
     let trackInfo = {
       id: newTrackId,
       participantId: track.getParticipantId(),
       type: track.getType(),
       track: track
-    } 
+    }
     window.telimed.remoteTracks.push(trackInfo)
     this.setState({
       remoteTrackIds: _.map(window.telimed.remoteTracks, (rt) => { return { id: rt.id, participantId: rt.participantId } })
@@ -100,13 +113,13 @@ export class App extends React.Component {
   onRoomTrackRemoved = (track) => {
     if (track.isLocal() === true) {
       return
-    } 
+    }
     let trackId = track.getId()
     window.telimed.remoteTracks = _.reject(window.telimed.remoteTracks, { id: trackId })
     this.setState({
       remoteTrackIds: _.map(window.telimed.remoteTracks, (rt) => { return { id: rt.id, participantId: rt.participantId } })
     })
-  
+
   }
 
   onConnectionSuccess = () => {
@@ -192,7 +205,7 @@ export class App extends React.Component {
       this.setState({
         status: 'Leaving...'
       })
-      try {  
+      try {
         window.telimed.activeRoom.leave().then(() => {
           if (window.telimed.activeConnection) {
             window.telimed.activeConnection.disconnect()
@@ -234,57 +247,57 @@ export class App extends React.Component {
 
     if (loaded === false) {
       return (
-        <div className='App'>
-          <div className='AppLoading'>
-            <h3>Loading...</h3>
+          <div className='App'>
+            <div className='AppLoading'>
+              <h3>Loading...</h3>
+            </div>
           </div>
-        </div>
       )
     }
 
     let remoteTrackGroups = _.groupBy(remoteTrackIds, (rt) => { return rt.participantId })
 
     return (
-      <div className="App">
-        <div className="TL">
-          <div>Server: <input readOnly={status !== 'closed'} type='text' onChange={(event) => { this.setState({ serverURL: event.target.value })}}  value={serverURL} /></div>
-          <div>Room: <input readOnly={status !== 'closed'} type='text' onChange={(event) => { this.setState({ roomId: event.target.value })}} value={roomId} /></div>
-          <div>
-            {status === 'closed'
-              ? <button onClick={this.onConnect}>
-                Connect
-              </button>
-              : status === 'open' 
-                  ? <button onClick={this.onDisconnect}>
-                      Disconnect
-                    </button>
-                  : <button disabled={true} >
-                      {status}
-                    </button>
-            } 
+        <div className="App">
+          <div className="TL">
+            <div>Server: <input readOnly={status !== 'closed'} type='text' onChange={(event) => { this.setState({ serverURL: event.target.value })}}  value={serverURL} /></div>
+            <div>Room: <input readOnly={status !== 'closed'} type='text' onChange={(event) => { this.setState({ roomId: event.target.value })}} value={roomId} /></div>
+            <div>
+              {status === 'closed'
+                  ? <button onClick={this.onConnect}>
+                    Connect
+                  </button>
+                  : status === 'open'
+                      ? <button onClick={this.onDisconnect}>
+                        Disconnect
+                      </button>
+                      : <button disabled={true} >
+                        {status}
+                      </button>
+              }
+            </div>
+            <div>{lastError}</div>
           </div>
-          <div>{lastError}</div>
-        </div>
-        <div className="TR">
-          <div className="TR_Header">
-            <h3>Me</h3>
-            <LocalSpeaker deviceList={deviceList} key='LocalSpeaker' defaultSpeakerId={defaultSpeakerId} onSpeakerChanged={this.onSpeakerChanged} />
+          <div className="TR">
+            <div className="TR_Header">
+              <h3>Me</h3>
+              <LocalSpeaker deviceList={deviceList} key='LocalSpeaker' defaultSpeakerId={defaultSpeakerId} onSpeakerChanged={this.onSpeakerChanged} />
+            </div>
+            <div class='TR_Body'>
+              <div className="TR_Body_Block">
+                <LocalTracks activeRoomId={activeRoomId} deviceList={deviceList} defaultMicId={defaultMicId} defaultVideoId={defaultVideoId} key='localTracks' />
+              </div>
+            </div>
           </div>
-          <div class='TR_Body'>
-            <div className="TR_Body_Block">
-              <LocalTracks activeRoomId={activeRoomId} deviceList={deviceList} defaultMicId={defaultMicId} defaultVideoId={defaultVideoId} key='localTracks' />
+          <div className="B">
+            <div className="B_Header">
+              <h3>Them</h3>
+            </div>
+            <div className="B_Body">
+              {this.renderRemoteTracks(remoteTrackGroups, selectedSpeakerDeviceId)}
             </div>
           </div>
         </div>
-        <div className="B">
-          <div className="B_Header">
-            <h3>Them</h3>
-          </div>
-          <div className="B_Body">
-            {this.renderRemoteTracks(remoteTrackGroups, selectedSpeakerDeviceId)}
-          </div>
-        </div>
-      </div>
     )
   }
 }
